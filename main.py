@@ -40,13 +40,13 @@ def detectInvalidInput(input: str) -> str:
     temp = input.lower().strip().split()
     for i in temp:
         # print(i)
-        if i in ["none", "detect","(detect" "auto", "automatically","automatically)","location", "detect user's location automatically"]:
+        if i in ["none", "name", "empty", "(empty", "only", "detects",  "detect","(detect" "auto", "automatically","automatically)","location", "detect user's location automatically"]:
             return ""
     return input
 
 
 @tool
-def getWeatherData(city: str = "") -> str:
+def getCurrentWeather(city: str = "") -> str:
     """
     Fetches weather data for a given city. If no city is provided, it detects the city from the user's IP.
     """
@@ -81,24 +81,70 @@ def getWeatherData(city: str = "") -> str:
         return f"Error: {str(e)}"
     
 get_weather_data = Tool(
-    name="getWeatherData",
-    func=getWeatherData,
+    name="getCurrentWeather",
+    func=getCurrentWeather,
     description=(
         "Fetches current weather for a city. If no city is given, it detects the user's location automatically. "
         "Use this tool to answer any questions about rain, temperature, or weather."
     ),
 )
 
+
+def getDailyForecast(city: str = "") -> str:
+    """
+    Fetches hourly weather forecast for a given city. If no city is provided, it detects the city from the user's IP.
+    """
+    if not openweathermap_api_key:
+        return "Error: OpenWeatherMap API key is not set."
+    
+    # Sanitize vague inputs
+    city = detectInvalidInput(city)
+
+    if not city.strip():
+        city = getCityFromIp()
+    if not city.strip():
+        return "Error: Unable to detect city from IP."
+    
+    url = "https://api.openweathermap.org/data/2.5/forecast/daily"
+    # url = "https://api.openweathermap.org/data/2.5/weather"
+    params = {
+        "q": city,
+        "appid": openweathermap_api_key,
+        "units": "metric",
+        #"cnt": 3,  # Number of days to forecast
+    }
+
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()  # Raise an error for bad responses
+        data = response.json()
+        if data["cod"] != '200':
+            return f"Error: {data.get('message', 'Unknown error')}"
+        return data
+    except requests.exceptions.RequestException as e:
+        return f"Error: {str(e)}"
+    
+get_daily_forecast = Tool(
+    name="getDailyForecast",
+    func=getDailyForecast,
+    description=(
+        "Fetches daily weather forecast for a city.  If no city is given, it detects the user's location automatically. You don't need to detect location. "
+        "Use this tool to answer any questions about rain, temperature, or weather for days after today. Input should be the provided city name only. If not provided,input will be empty string."
+    ),
+)
     
 
-tools = [get_weather_data]
+tools = [
+    get_weather_data,
+    get_daily_forecast,
+]
 
 agent = initialize_agent(
     tools=tools,
     llm=llm,
     agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
     verbose=False,
-    # max_iterations=5,  # Stops after 3 steps
+    max_iterations=10,  # Stops after 3 steps
     # early_stopping_method="generate",  # Tries to produce an answer even if interrupted
 )
 
