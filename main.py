@@ -20,7 +20,8 @@ if not openweathermap_api_key:
 llm = ChatGroq(
     groq_api_key=groq_api_key,
     model="llama-3.1-8b-instant",
-    temperature=0.2,
+    # model="deepseek-r1-distill-llama-70b",
+    temperature=0.7,
     # max_tokens=1000,
     # top_p=0.95,
     # frequency_penalty=0,
@@ -80,11 +81,11 @@ def getCurrentWeather(city: str = "") -> str:
     except requests.exceptions.RequestException as e:
         return f"Error: {str(e)}"
     
-get_weather_data = Tool(
+get_current_weather_data = Tool(
     name="getCurrentWeather",
     func=getCurrentWeather,
     description=(
-        "Fetches current weather for a city. If no city is given, it detects the user's location automatically. "
+        "Fetches today's current weather for a city. If no city is given, it detects the user's location automatically. "
         "Use this tool to answer any questions about rain, temperature, or weather."
     ),
 )
@@ -135,7 +136,7 @@ get_daily_forecast = Tool(
     
 
 tools = [
-    get_weather_data,
+    get_current_weather_data,
     get_daily_forecast,
 ]
 
@@ -143,12 +144,12 @@ agent = initialize_agent(
     tools=tools,
     llm=llm,
     agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
-    verbose=False,
+    verbose=True,
     max_iterations=10,  # Stops after 3 steps
     # early_stopping_method="generate",  # Tries to produce an answer even if interrupted
 )
 
 query = input("Ask me about the weather: ")
 response = agent.invoke({"input": query, "chat_history": []})
-print(response["output"])
+print("Response:" ,response["output"])
 
