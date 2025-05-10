@@ -47,3 +47,17 @@ OPENWEATHERMAP_API_KEY=your_openweathermap_api_key_here
 python main.py
 ```
 
+Once running, the assistant will prompt:
+```vbnet
+Ask me about the weather:
+```
+
+You can ask questions like:
+ * What's the weather like in New York today?
+ * Give me the forecast for London.
+ * What was the weather in Tokyo 3 days ago?
+ * Will it rain in Paris tomorrow?
+ * Type exit to quit the program.
+
+
+
