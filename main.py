@@ -102,7 +102,7 @@ agent = initialize_agent(
     # early_stopping_method="generate",  # Tries to produce an answer even if interrupted
 )
 
-query = "Will it rain cats and dogs today?"
+query = input("Ask me about the weather: ")
 response = agent.invoke({"input": query, "chat_history": []})
 print(response["output"])
 
