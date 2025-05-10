@@ -21,7 +21,8 @@ if not openweathermap_api_key:
 llm = ChatGroq(
     groq_api_key=groq_api_key,
     # model="llama-3.1-8b-instant",
-    model="deepseek-r1-distill-llama-70b",
+    # model="deepseek-r1-distill-llama-70b",
+    model="qwen-qwq-32b",
     temperature=0.7,
     # max_tokens=1000,
     # top_p=0.95,
@@ -61,14 +62,6 @@ def getCityFromIp(input: str = "") -> str:
         return data.get("city", "")
     except Exception as e:
         return f"Error detecting city: {e}"
-    
-def detectInvalidInput(input: str) -> str:
-    temp = input.lower().strip().split()
-    for i in temp:
-        # print(i)
-        if i in ["none", "name", "empty", "(empty", "only", "detects",  "detect","(detect" "auto", "automatically","automatically)","location", "detect user's location automatically"]:
-            return ""
-    return input
 
 
 @tool
@@ -80,14 +73,9 @@ def getCurrentWeather(city: str = "") -> str:
     if not openweathermap_api_key:
         return "Error: OpenWeatherMap API key is not set."
     # Simulate fetching weather 
-    
-    # Sanitize vague inputs
-    city = detectInvalidInput(city)
 
-    if not city.strip():
+    if city is None or city == 'None' or city == 'none':
         city = getCityFromIp()
-    if not city.strip():
-        return "Error: Unable to detect city from IP."
     
     url = "https://api.openweathermap.org/data/2.5/weather"
     params = {
@@ -111,6 +99,7 @@ get_current_weather_data = Tool(
     func=getCurrentWeather,
     description=(
         "Fetches today's current weather for a city. If no city is given, it detects the user's location automatically. "
+        "Input should be the provided city name only. If not provided,input will be 'None'."
         "Use this tool to answer any questions about rain, temperature, or weather."
     ),
 )
@@ -123,13 +112,9 @@ def getDailyForecast(city: str = "") -> str:
     if not openweathermap_api_key:
         return "Error: OpenWeatherMap API key is not set."
     
-    # Sanitize vague inputs
-    city = detectInvalidInput(city)
 
-    if not city.strip():
+    if city is None or city == 'None' or city == 'none':
         city = getCityFromIp()
-    if not city.strip():
-        return "Error: Unable to detect city from IP."
     
     url = "https://api.openweathermap.org/data/2.5/forecast/daily"
     # url = "https://api.openweathermap.org/data/2.5/weather"
@@ -155,7 +140,7 @@ get_daily_forecast = Tool(
     func=getDailyForecast,
     description=(
         "Fetches daily weather forecast for a city.  If no city is given, it detects the user's location automatically. You don't need to detect location. "
-        "Use this tool to answer any questions about rain, temperature, or weather for days after today. Input should be the provided city name only. If not provided,input will be empty string."
+        "Use this tool to answer any questions about rain, temperature, or weather for days after today. Input should be the provided city name only. If not provided,input will be 'None'."
     ),
 )
 
@@ -169,32 +154,22 @@ def getHistoricalData(input):
     if not openweathermap_api_key:
         return "Error: OpenWeatherMap API key is not set."
 
-    
-    # Sanitize vague inputs
-    # city = detectInvalidInput(city)
 
     inputs = input.split(",")
-    # ("inputs", inputs)
     if len(inputs) != 2:
         return "Error: Invalid input format. Please provide city and days in the format: city, days"
     city = inputs[0].strip()
-    # print("city", city)
     days =int(inputs[1].strip())
 
     if city is  None or city == 'None' or city == 'none':
         city = getCityFromIp()
-    # if city is None:
-        # return "Error: Unable to detect city from IP."
     
     end_date = datetime.now()
     start_date = end_date - timedelta(days=days)
     start_timestamp = int(start_date.timestamp())
     end_timestamp = int(end_date.timestamp())
-
-    # print("hi", city)
     
     lon, lat = get_coordinates(city)
-    # print(lon, lat)
     url = "https://history.openweathermap.org/data/2.5/history/city"
     params = {
         #"q": city,
@@ -240,10 +215,10 @@ agent = initialize_agent(
     tools=tools,
     llm=llm,
     agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
-    verbose=False,
+    verbose=True,
     max_iterations=5,
     handle_parsing_errors=True , # Stops after 3 steps
-    # early_stopping_method="generate",  # Tries to produce an answer even if interrupted
+    early_stopping_method="generate",  # Tries to produce an answer even if interrupted
 )
 
 while True:
@@ -252,6 +227,4 @@ while True:
         break
     response = agent.invoke({"input": query, "chat_history": []})
     print("Response:" ,response["output"])
-
-# print(getHistoricalData("dhaka", 1))
 
