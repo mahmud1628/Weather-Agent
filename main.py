@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from langchain.agents import Tool, tool, AgentType, initialize_agent
 import os
 import requests
+from datetime import datetime, timedelta
 
 
 
@@ -19,14 +20,38 @@ if not openweathermap_api_key:
 
 llm = ChatGroq(
     groq_api_key=groq_api_key,
-    model="llama-3.1-8b-instant",
-    # model="deepseek-r1-distill-llama-70b",
+    # model="llama-3.1-8b-instant",
+    model="deepseek-r1-distill-llama-70b",
     temperature=0.7,
     # max_tokens=1000,
     # top_p=0.95,
     # frequency_penalty=0,
     # presence_penalty=0,
 )
+
+def get_coordinates(city: str):
+    """
+    Fetches the coordinates (latitude and longitude) of a given city using OpenWeatherMap API.
+    """
+    if not openweathermap_api_key:
+        return "Error: OpenWeatherMap API key is not set."
+    
+    url = "https://api.openweathermap.org/data/2.5/weather"
+    params = {
+        "q": city,
+        "appid": openweathermap_api_key,
+        "units": "metric",
+    }
+
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()  # Raise an error for bad responses
+        data = response.json()
+        if data.get("cod") != 200:
+            return f"Error: {data.get('message', 'Unknown error')}"
+        return data['coord']['lon'], data['coord']['lat']
+    except requests.exceptions.RequestException as e:
+        return f"Error: {str(e)}"
 
 def getCityFromIp(input: str = "") -> str:
     try:
@@ -133,23 +158,100 @@ get_daily_forecast = Tool(
         "Use this tool to answer any questions about rain, temperature, or weather for days after today. Input should be the provided city name only. If not provided,input will be empty string."
     ),
 )
+
+
+@tool
+def getHistoricalData(input):
+    """
+    Fetches historical weather data for a given city and number of days ago.
+    Two inputs are required: city and days. If no city is provided, it detects the city from the user's IP."
+    """
+    if not openweathermap_api_key:
+        return "Error: OpenWeatherMap API key is not set."
+
+    
+    # Sanitize vague inputs
+    # city = detectInvalidInput(city)
+
+    inputs = input.split(",")
+    # ("inputs", inputs)
+    if len(inputs) != 2:
+        return "Error: Invalid input format. Please provide city and days in the format: city, days"
+    city = inputs[0].strip()
+    # print("city", city)
+    days =int(inputs[1].strip())
+
+    if city is  None or city == 'None' or city == 'none':
+        city = getCityFromIp()
+    # if city is None:
+        # return "Error: Unable to detect city from IP."
+    
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    start_timestamp = int(start_date.timestamp())
+    end_timestamp = int(end_date.timestamp())
+
+    # print("hi", city)
+    
+    lon, lat = get_coordinates(city)
+    # print(lon, lat)
+    url = "https://history.openweathermap.org/data/2.5/history/city"
+    params = {
+        #"q": city,
+        "lat": lat,
+        "lon": lon,
+        "appid": openweathermap_api_key,
+        'type': 'hour',
+        'start': start_timestamp,
+        'end': end_timestamp,
+        'cnt': 1,
+    }
+
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()  # Raise an error for bad responses
+        data = response.json()
+        if data["cod"] != '200':
+            return f"Error: {data.get('message', 'Unknown error')}"
+        return data
+    except requests.exceptions.RequestException as e:
+        return f"Error: {str(e)}"
+    
+get_historical_data = Tool(
+    name="getHistoricalData",
+    func=getHistoricalData,
+    description=(
+        "Fetches historical weather data for a city. "
+        "Two inputs are required: city and days. If no city is provided, it detects the city from the user's IP, so pass 'None'"
+        "Inout format :city, days "
+        "Use this tool to answer any questions about rain, temperature, or weather for days before today. "
+    ),
+)
+
     
 
 tools = [
     get_current_weather_data,
     get_daily_forecast,
+    get_historical_data,
 ]
 
 agent = initialize_agent(
     tools=tools,
     llm=llm,
     agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
-    verbose=True,
-    max_iterations=10,  # Stops after 3 steps
+    verbose=False,
+    max_iterations=5,
+    handle_parsing_errors=True , # Stops after 3 steps
     # early_stopping_method="generate",  # Tries to produce an answer even if interrupted
 )
 
-query = input("Ask me about the weather: ")
-response = agent.invoke({"input": query, "chat_history": []})
-print("Response:" ,response["output"])
+while True:
+    query = input("Ask me about the weather: ")
+    if query == "exit":
+        break
+    response = agent.invoke({"input": query, "chat_history": []})
+    print("Response:" ,response["output"])
+
+# print(getHistoricalData("dhaka", 1))
 
