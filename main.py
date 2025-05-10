@@ -1,8 +1,12 @@
+# Weather Agent using LangChain and Groq
+
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 from langchain.agents import Tool, tool, AgentType, initialize_agent
 import os
 import requests
+
+
 
 load_dotenv()
 
@@ -23,12 +27,42 @@ llm = ChatGroq(
     # presence_penalty=0,
 )
 
+def getCityFromIp(input: str = "") -> str:
+    try:
+        response = requests.get("https://ipinfo.io/json")
+        response.raise_for_status()
+        data = response.json()
+        return data.get("city", "")
+    except Exception as e:
+        return f"Error detecting city: {e}"
+    
+def detectInvalidInput(input: str) -> str:
+    temp = input.lower().strip().split()
+    for i in temp:
+        # print(i)
+        if i in ["none", "detect","(detect" "auto", "automatically","automatically)","location", "detect user's location automatically"]:
+            return ""
+    return input
+
+
 @tool
-def getWeatherData(city: str) -> str:
-    """Fetches weather data for a given city"""
+def getWeatherData(city: str = "") -> str:
+    """
+    Fetches weather data for a given city. If no city is provided, it detects the city from the user's IP.
+    """
+
     if not openweathermap_api_key:
         return "Error: OpenWeatherMap API key is not set."
-    # Simulate fetching weather data
+    # Simulate fetching weather 
+    
+    # Sanitize vague inputs
+    city = detectInvalidInput(city)
+
+    if not city.strip():
+        city = getCityFromIp()
+    if not city.strip():
+        return "Error: Unable to detect city from IP."
+    
     url = "https://api.openweathermap.org/data/2.5/weather"
     params = {
         "q": city,
@@ -50,11 +84,11 @@ get_weather_data = Tool(
     name="getWeatherData",
     func=getWeatherData,
     description=(
-        "Fetches weather data for a given city. "
-        "Input should be a city name. "
-        "Returns the weather data in JSON format."
+        "Fetches current weather for a city. If no city is given, it detects the user's location automatically. "
+        "Use this tool to answer any questions about rain, temperature, or weather."
     ),
 )
+
     
 
 tools = [get_weather_data]
@@ -63,11 +97,12 @@ agent = initialize_agent(
     tools=tools,
     llm=llm,
     agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
-    verbose=True,
-    max_iterations=5,  # Stops after 3 steps
-    early_stopping_method="generate",  # Tries to produce an answer even if interrupted
+    verbose=False,
+    # max_iterations=5,  # Stops after 3 steps
+    # early_stopping_method="generate",  # Tries to produce an answer even if interrupted
 )
 
-query = "Should i take an umbrella while going out? I live in Dhaka, Bangladesh."
-agent.invoke({"input": query, "chat_history": []})
+query = "Will it rain cats and dogs today?"
+response = agent.invoke({"input": query, "chat_history": []})
+print(response["output"])
 
