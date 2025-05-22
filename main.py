@@ -2,10 +2,9 @@
 
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
-from langchain.agents import Tool, tool, AgentType, initialize_agent
+from langchain.agents import Tool, AgentType, initialize_agent
 import os
 import requests
-from datetime import datetime, timedelta
 import json
 
 
@@ -216,13 +215,9 @@ agent = initialize_agent(
     chat_history=[],
 )
 
-# while True:
-#     query = input("Ask me about the weather: ")
-#     if query == "exit":
-#         break
-#     response = agent.invoke({"input": query, "chat_history": []})
-#     print("Response:" ,response["output"])
-
-query = input("ask:")
-response = agent.invoke({"input": query,"chat_history": []}) # tried to use agent.run() but it says it is depricated
-print(response)
+while True:
+    query = input("Ask me about the weather: ")
+    if query == "exit":
+        break
+    response = agent.invoke({"input": query, "chat_history": []})
+    print("Response:" ,response["output"])
