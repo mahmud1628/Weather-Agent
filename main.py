@@ -19,7 +19,7 @@ if not openweathermap_api_key:
     raise ValueError("OPENWEATHERMAP_API_KEY environment variable not set.")
 
 llm = ChatGroq(
-    groq_api_key=groq_api_key,
+    api_key=groq_api_key,
     # model="llama-3.1-8b-instant",
     # model="deepseek-r1-distill-llama-70b",
     model="qwen-qwq-32b",
@@ -215,7 +215,7 @@ agent = initialize_agent(
     tools=tools,
     llm=llm,
     agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
-    verbose=True,
+    verbose=False,
     max_iterations=5,
     handle_parsing_errors=True , # Stops after 3 steps
     early_stopping_method="generate",  # Tries to produce an answer even if interrupted
