@@ -6,6 +6,7 @@ from langchain.agents import Tool, tool, AgentType, initialize_agent
 import os
 import requests
 from datetime import datetime, timedelta
+import json
 
 
 
@@ -17,6 +18,9 @@ if not groq_api_key:
 openweathermap_api_key = os.getenv("OPENWEATHERMAP_API_KEY")
 if not openweathermap_api_key:
     raise ValueError("OPENWEATHERMAP_API_KEY environment variable not set.")
+tomorrow_io_api_key = os.getenv("TOMORROW_IO_API_KEY")
+if not tomorrow_io_api_key:
+    raise ValueError("TOMORROW_IO_API_KEY environment variable not set.")
 
 llm = ChatGroq(
     api_key=groq_api_key,
@@ -24,35 +28,31 @@ llm = ChatGroq(
     # model="deepseek-r1-distill-llama-70b",
     model="qwen-qwq-32b",
     temperature=0.7,
-    # max_tokens=1000,
-    # top_p=0.95,
-    # frequency_penalty=0,
-    # presence_penalty=0,
 )
 
-def get_coordinates(city: str):
-    """
-    Fetches the coordinates (latitude and longitude) of a given city using OpenWeatherMap API.
-    """
-    if not openweathermap_api_key:
-        return "Error: OpenWeatherMap API key is not set."
+# def get_coordinates(city: str): 
+#     """
+#     Fetches the coordinates (latitude and longitude) of a given city using OpenWeatherMap API.
+#     """
+#     if not openweathermap_api_key:
+#         return "Error: OpenWeatherMap API key is not set."
     
-    url = "https://api.openweathermap.org/data/2.5/weather"
-    params = {
-        "q": city,
-        "appid": openweathermap_api_key,
-        "units": "metric",
-    }
+#     url = "https://api.openweathermap.org/data/2.5/weather"
+#     params = {
+#         "q": city,
+#         "appid": openweathermap_api_key,
+#         "units": "metric",
+#     }
 
-    try:
-        response = requests.get(url, params=params)
-        response.raise_for_status()  # Raise an error for bad responses
-        data = response.json()
-        if data.get("cod") != 200:
-            return f"Error: {data.get('message', 'Unknown error')}"
-        return data['coord']['lon'], data['coord']['lat']
-    except requests.exceptions.RequestException as e:
-        return f"Error: {str(e)}"
+#     try:
+#         response = requests.get(url, params=params)
+#         response.raise_for_status()  # Raise an error for bad responses
+#         data = response.json()
+#         if data.get("cod") != 200:
+#             return f"Error: {data.get('message', 'Unknown error')}"
+#         return data['coord']['lon'], data['coord']['lat']
+#     except requests.exceptions.RequestException as e:
+#         return f"Error: {str(e)}"
 
 def getCityFromIp(input: str = "") -> str:
     try:
@@ -64,33 +64,33 @@ def getCityFromIp(input: str = "") -> str:
         return f"Error detecting city: {e}"
 
 
-@tool
-def getCurrentWeather(city: str = "") -> str:
+def getCurrentWeather(city: str = "None") -> str:
     """
     Fetches weather data for a given city. If no city is provided, it detects the city from the user's IP.
     """
 
     if not openweathermap_api_key:
         return "Error: OpenWeatherMap API key is not set."
-    # Simulate fetching weather 
 
-    if city is None or city == 'None' or city == 'none':
+    if city is None or city.lower() == 'none':
         city = getCityFromIp()
     
-    url = "https://api.openweathermap.org/data/2.5/weather"
+    url = "https://api.openweathermap.org/data/2.5/forecast"
     params = {
         "q": city,
         "appid": openweathermap_api_key,
         "units": "metric",
+        "cnt": 8
     }
 
     try:
         response = requests.get(url, params=params)
         response.raise_for_status()  # Raise an error for bad responses
         data = response.json()
-        if data.get("cod") != 200:
+        if data.get("cod") != '200':
             return f"Error: {data.get('message', 'Unknown error')}"
-        return data
+        return json.dumps(data)
+    
     except requests.exceptions.RequestException as e:
         return f"Error: {str(e)}"
     
@@ -132,20 +132,7 @@ def getDailyForecast(city: str = "") -> str:
         data = response.json()
         if data["cod"] != '200':
             return f"Error: {data.get('message', 'Unknown error')}"
-        
-        city_name = data["city"]["name"]
-        country = data["city"]["country"]
-
-        forecast_lines = [f"Weather forecast for {city_name}, {country}:\n"]
-
-        for entry in data["list"]:
-            timestamp = datetime.fromtimestamp(entry["dt"]).strftime("%a %H:%M")
-            temp = entry["main"]["temp"]
-            feels_like = entry["main"]["feels_like"]
-            description = entry["weather"][0]["description"].capitalize()
-            forecast_lines.append(f"{timestamp}: {description}, {temp}°C (feels like {feels_like}°C)")
-
-        return "\n".join(forecast_lines)
+        return json.dumps(data)
     except requests.exceptions.RequestException as e:
         return f"Error: {str(e)}"
     
@@ -159,7 +146,6 @@ get_daily_forecast = Tool(
 )
 
 
-@tool
 def getHistoricalData(input):
     """
     Fetches historical weather data for a given city and number of days ago.
@@ -177,32 +163,26 @@ def getHistoricalData(input):
 
     if city is  None or city == 'None' or city == 'none':
         city = getCityFromIp()
-    
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=days)
-    start_timestamp = int(start_date.timestamp())
-    end_timestamp = int(end_date.timestamp())
-    
-    lon, lat = get_coordinates(city)
-    url = "https://history.openweathermap.org/data/2.5/history/city"
+
+    url = "https://api.tomorrow.io/v4/weather/history/recent"
+
     params = {
-        #"q": city,
-        "lat": lat,
-        "lon": lon,
-        "appid": openweathermap_api_key,
-        'type': 'hour',
-        'start': start_timestamp,
-        'end': end_timestamp,
-        'cnt': 1,
+        "location": city,
+        "apikey": tomorrow_io_api_key,
     }
 
     try:
         response = requests.get(url, params=params)
-        response.raise_for_status()  # Raise an error for bad responses
+        response.raise_for_status()
         data = response.json()
-        if data["cod"] != '200':
-            return f"Error: {data.get('message', 'Unknown error')}"
-        return data
+
+        # print(data)
+
+        timelines = data.get("timelines", {})
+        if "hourly" not in timelines or not timelines["hourly"]:
+            return f"No hourly historical data available for {city}."
+        return json.dumps(timelines.get("daily", []))
+
     except requests.exceptions.RequestException as e:
         return f"Error: {str(e)}"
     
@@ -230,8 +210,8 @@ agent = initialize_agent(
     llm=llm,
     agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
     verbose=True,
-    max_iterations=5,
-    handle_parsing_errors=True , # Stops after 3 steps
+    #max_iterations=5,
+    handle_parsing_errors=True ,
     early_stopping_method="generate",  # Tries to produce an answer even if interrupted
     chat_history=[],
 )
@@ -244,5 +224,5 @@ agent = initialize_agent(
 #     print("Response:" ,response["output"])
 
 query = input("ask:")
-response = agent.invoke({"input": query,"chat_history": []})
+response = agent.invoke({"input": query,"chat_history": []}) # tried to use agent.run() but it says it is depricated
 print(response)
