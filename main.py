@@ -116,13 +116,14 @@ def getDailyForecast(city: str = "") -> str:
     if city is None or city == 'None' or city == 'none':
         city = getCityFromIp()
     
-    url = "https://api.openweathermap.org/data/2.5/forecast/daily"
+    # url = "https://api.openweathermap.org/data/2.5/forecast/daily"
     # url = "https://api.openweathermap.org/data/2.5/weather"
+    url = "https://api.openweathermap.org/data/2.5/forecast"
     params = {
         "q": city,
         "appid": openweathermap_api_key,
         "units": "metric",
-        #"cnt": 3,  # Number of days to forecast
+        #"cnt": 40
     }
 
     try:
@@ -131,7 +132,20 @@ def getDailyForecast(city: str = "") -> str:
         data = response.json()
         if data["cod"] != '200':
             return f"Error: {data.get('message', 'Unknown error')}"
-        return data
+        
+        city_name = data["city"]["name"]
+        country = data["city"]["country"]
+
+        forecast_lines = [f"Weather forecast for {city_name}, {country}:\n"]
+
+        for entry in data["list"]:
+            timestamp = datetime.fromtimestamp(entry["dt"]).strftime("%a %H:%M")
+            temp = entry["main"]["temp"]
+            feels_like = entry["main"]["feels_like"]
+            description = entry["weather"][0]["description"].capitalize()
+            forecast_lines.append(f"{timestamp}: {description}, {temp}°C (feels like {feels_like}°C)")
+
+        return "\n".join(forecast_lines)
     except requests.exceptions.RequestException as e:
         return f"Error: {str(e)}"
     
@@ -215,16 +229,20 @@ agent = initialize_agent(
     tools=tools,
     llm=llm,
     agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
-    verbose=False,
+    verbose=True,
     max_iterations=5,
     handle_parsing_errors=True , # Stops after 3 steps
     early_stopping_method="generate",  # Tries to produce an answer even if interrupted
+    chat_history=[],
 )
 
-while True:
-    query = input("Ask me about the weather: ")
-    if query == "exit":
-        break
-    response = agent.invoke({"input": query, "chat_history": []})
-    print("Response:" ,response["output"])
+# while True:
+#     query = input("Ask me about the weather: ")
+#     if query == "exit":
+#         break
+#     response = agent.invoke({"input": query, "chat_history": []})
+#     print("Response:" ,response["output"])
 
+query = input("ask:")
+response = agent.invoke({"input": query,"chat_history": []})
+print(response)
