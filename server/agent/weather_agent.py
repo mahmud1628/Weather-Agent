@@ -12,18 +12,7 @@ from langchain_community.chat_message_histories import FirestoreChatMessageHisto
 
 load_dotenv()
 
-SESSION_ID = "weather-agent-session"
-COLLECTION_NAME = "chat-history"
-
-print("Initializing firestore chat message history...")
-chat_history = FirestoreChatMessageHistory(
-    session_id=SESSION_ID,
-    collection_name=COLLECTION_NAME,
-    user_id="user-1",
-)
-
-print("Chat history initialized.")
-print("Current chat history:", chat_history.messages)
+chat_histories = {}
 
 groq_api_key = os.getenv("GROQ_API_KEY")
 if not groq_api_key:
@@ -42,30 +31,6 @@ llm = ChatGroq(
     model="qwen-qwq-32b",
     temperature=0.7,
 )
-
-# def get_coordinates(city: str): 
-#     """
-#     Fetches the coordinates (latitude and longitude) of a given city using OpenWeatherMap API.
-#     """
-#     if not openweathermap_api_key:
-#         return "Error: OpenWeatherMap API key is not set."
-    
-#     url = "https://api.openweathermap.org/data/2.5/weather"
-#     params = {
-#         "q": city,
-#         "appid": openweathermap_api_key,
-#         "units": "metric",
-#     }
-
-#     try:
-#         response = requests.get(url, params=params)
-#         response.raise_for_status()  # Raise an error for bad responses
-#         data = response.json()
-#         if data.get("cod") != 200:
-#             return f"Error: {data.get('message', 'Unknown error')}"
-#         return data['coord']['lon'], data['coord']['lat']
-#     except requests.exceptions.RequestException as e:
-#         return f"Error: {str(e)}"
 
 def getCityFromIp(input: str = "") -> str:
     try:
@@ -218,21 +183,28 @@ tools = [
     get_historical_data,
 ]
 
-agent = initialize_agent(
-    tools=tools,
-    llm=llm,
-    agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
-    verbose=True,
-    #max_iterations=5,
-    handle_parsing_errors=True ,
-    early_stopping_method="generate",  # Tries to produce an answer even if interrupted
-)
+def get_agent(session_id: str):
+    agent = initialize_agent(
+        tools=tools,
+        llm=llm,
+        agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
+        verbose=True,
+        #max_iterations=5,
+        handle_parsing_errors=True ,
+        early_stopping_method="generate",  # Tries to produce an answer even if interrupted
+    )
 
-while True:
-    query = input("Ask me about the weather: ")
-    if query == "exit":
-        break
-    chat_history.add_user_message(query)
-    response = agent.invoke({"input": query, "chat_history": chat_history.messages[:10]})
-    chat_history.add_ai_message(response["output"])
-    print("Response:" ,response["output"])
+    if session_id not in chat_histories:
+        chat_histories[session_id] = FirestoreChatMessageHistory(
+        session_id=session_id, collection_name="chat-history", user_id="user-1")
+    history = chat_histories[session_id]
+
+    return agent, history
+
+def get_agent_response(query: str, session_id: str):
+    agent, history = get_agent(session_id)
+    trimmed = history.messages[:10] if len(history.messages) > 10 else history.messages
+    response = agent.invoke({"input": query, "chat_history": trimmed})
+    history.add_user_message(query)
+    history.add_ai_message(response["output"])
+    return response["output"]
