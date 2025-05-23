@@ -6,6 +6,8 @@ function App() {
   const [input, setInput] = useState("");
   const bottomRef = useRef(null);
 
+  const [isTyping, setIsTyping] = useState(false);
+
   // Scroll chat to bottom when messages update
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -17,6 +19,7 @@ function App() {
     const userMessage = { sender: "user", text: input };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setIsTyping(true); // Start typing indicator
 
     try {
       const response = await axios.post("http://127.0.0.1:8000/chat", {
@@ -35,6 +38,8 @@ function App() {
         text: "Error: Could not get response from server.",
       };
       setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsTyping(false); // Stop typing indicator
     }
   };
 
@@ -60,6 +65,19 @@ function App() {
             {msg.text}
           </div>
         ))}
+        {isTyping && (
+          <div
+            style={{
+              ...styles.message,
+              alignSelf: "flex-start",
+              backgroundColor: "#E8E8E8",
+              fontStyle: "italic",
+            }}
+          >
+            Agent is typing...
+          </div>
+        )}
+
         <div ref={bottomRef} />
       </div>
       <div style={styles.inputArea}>
