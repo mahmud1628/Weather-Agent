@@ -6,10 +6,24 @@ from langchain.agents import Tool, AgentType, initialize_agent
 import os
 import requests
 import json
+from langchain_community.chat_message_histories import FirestoreChatMessageHistory
 
 
 
 load_dotenv()
+
+SESSION_ID = "weather-agent-session"
+COLLECTION_NAME = "chat-history"
+
+print("Initializing firestore chat message history...")
+chat_history = FirestoreChatMessageHistory(
+    session_id=SESSION_ID,
+    collection_name=COLLECTION_NAME,
+    user_id="user-1",
+)
+
+print("Chat history initialized.")
+print("Current chat history:", chat_history.messages)
 
 groq_api_key = os.getenv("GROQ_API_KEY")
 if not groq_api_key:
@@ -219,5 +233,7 @@ while True:
     query = input("Ask me about the weather: ")
     if query == "exit":
         break
-    response = agent.invoke({"input": query, "chat_history": []})
+    chat_history.add_user_message(query)
+    response = agent.invoke({"input": query, "chat_history": chat_history.messages})
+    chat_history.add_ai_message(response["output"])
     print("Response:" ,response["output"])
