@@ -6,8 +6,6 @@ This is a conversational weather assistant powered by **LangChain**, **Groq LLMs
 - Provide **daily forecasts**
 - Retrieve **historical weather data**
 
-If no city is provided, it detects the user's location automatically using their IP address.
-
 ---
 
 ## ✅ Requirements
@@ -18,7 +16,9 @@ Before you begin, ensure you have the following:
 - API keys for:
   - [Groq API](https://console.groq.com/)
   - [OpenWeatherMap API](https://openweathermap.org/api)
-
+- FastAPI
+- Firebase
+- Google Cloud CLI
 ---
 
 ## 🧠 Installation Steps
@@ -42,15 +42,15 @@ GROQ_API_KEY=your_groq_api_key_here
 OPENWEATHERMAP_API_KEY=your_openweathermap_api_key_here
 ```
 
-4. **Run the python file**
+4. **Run the server**
 ```bash
-python main.py
+uvicorn main::app --reload
 ```
-
-Once running, the assistant will prompt:
-```vbnet
-Ask me about the weather:
+5. **Run the react app**
+```bash
+npm start
 ```
+Once running, you can give prompt to the agent from the UI.
 
 You can ask questions like:
  * What's the weather like in New York today?
